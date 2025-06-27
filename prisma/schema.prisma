@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  name         String?
+  email        String   @unique
+  password     String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  refreshToken String?  @unique
+  address      String?
+  phone        String?
+  id           Int      @id @default(autoincrement())
+  orders       Order[]
+  cart         Cart?
+  addresses    Address[]
+}
+
+model Brand {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  models   Model[]
+  products Product[]
+}
+
+model Model {
+  id        Int       @id @default(autoincrement())
+  brandId   Int
+  name      String
+  yearStart Int?
+  yearEnd   Int?
+  engines   Engine[]
+  brand     Brand     @relation(fields: [brandId], references: [id])
+  products  Product[]
+}
+
+model Engine {
+  id              Int                    @id @default(autoincrement())
+  modelId         Int
+  type            String?
+  displacement    String?
+  horsepower      Int?
+  model           Model                  @relation(fields: [modelId], references: [id])
+  products        Product[]
+  compatibilities ProductCompatibility[]
+}
+
+model Category {
+  id            Int        @id @default(autoincrement())
+  name          String
+  parentId      Int?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  type          String     @default("home_page")
+  parent        Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: Cascade)
+  subcategories Category[] @relation("CategoryToCategory")
+  products      Product[]
+
+  @@unique([name, parentId, type])
+}
+
+model Product {
+  id                 Int                    @id @default(autoincrement())
+  name               String
+  description        String?
+  price              Float
+  stock              Int                    @default(0)
+  soldCount          Int?
+  categoryId         Int
+  compatibleEngineId Int?
+  imageUrl           String[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  isFeatured         Boolean                @default(false)
+  brandId            Int?
+  modelId            Int?
+  imagePublicIds     String[]
+  orderItems         OrderItem[]
+  cartItems          CartItem[]
+  partNumbers        PartNumber[]           @relation("ProductToPartNumber")
+  brand              Brand?                 @relation(fields: [brandId], references: [id])
+  category           Category               @relation(fields: [categoryId], references: [id])
+  compatibleEngine   Engine?                @relation(fields: [compatibleEngineId], references: [id])
+  model              Model?                 @relation(fields: [modelId], references: [id])
+  compatibilities    ProductCompatibility[]
+}
+
+model FeatureBanner {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Coupon {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  discount  Float
+  startDate DateTime
+  endDate   DateTime
+  userLimit Int?
+  userCount Int?     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model ProductCompatibility {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  engineId  Int
+  engine    Engine  @relation(fields: [engineId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  addressId     Int
+  totalAmount   Float
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentId     String?
+  createdAt     DateTime      @default(now())
+  user          User          @relation(fields: [userId], references: [id])
+  address       Address       @relation(fields: [addressId], references: [id])
+  items         OrderItem[]
+  coupon        Coupon?       @relation(fields: [couponId], references: [id])
+  couponId      Int?
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  price     Float
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model PartNumber {
+  id           Int      @id @default(autoincrement())
+  number       String   @unique
+  type         String
+  productId    Int
+  manufacturer String
+  isOriginal   Boolean  @default(false)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  product      Product  @relation("ProductToPartNumber", fields: [productId], references: [id])
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cartId    Int
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+model Address {
+    id        Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  name       String
+  address    String
+  city       String
+  country    String
+  postalCode String
+  phone      String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     Order[]
+
+  @@index([userId])
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+}
+
+enum Role {
+  USER
+  SUPER_ADMIN
+}
